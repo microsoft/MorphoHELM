@@ -1,0 +1,9 @@
+README.md
+pyproject.toml
+src/cellpainting_huggingface_loader/__init__.py
+src/cellpainting_huggingface_loader/create_splits.py
+src/cellpainting_huggingface_loader.egg-info/PKG-INFO
+src/cellpainting_huggingface_loader.egg-info/SOURCES.txt
+src/cellpainting_huggingface_loader.egg-info/dependency_links.txt
+src/cellpainting_huggingface_loader.egg-info/requires.txt
+src/cellpainting_huggingface_loader.egg-info/top_level.txt

@@ -1,0 +1,165 @@
+# Streamlined multi-split inference config
+# =======================================
+# Run with:
+#   python feature-extraction/src/run_inference_splits.py \
+#     --config feature-extraction/configs/inference_splits.yaml \
+#     --splits cpg-tgt2,cpg-crispr,bbbc036 \
+#     --dry-run
+#
+# Edit the paths below to point to the HuggingFace datasets created by
+# raw_to_huggingface/transform_dataset.py.
+
+execution:
+  mode: "local"
+
+local:
+  data_path: null
+  metadata_path: null
+  output_path: null
+  log_path: "logs/inference"
+  git_clone_dir: "datasets"
+
+amlt:
+  data_path: null
+  metadata_path: null
+  output_path: null
+  log_path: "logs/inference"
+  git_clone_dir: "datasets"
+
+split_inference:
+  output_root:
+    local: "results/inference"
+    amlt: "/mnt/cellpainting-features/MorphoBenchFeatures/non-patch"
+
+  splits:
+    cpg-crispr:
+      dataset_name: "cpg0016"
+      bit_depth: 8
+      split: "cpg-crispr"
+      local:
+        data_path: "data/huggingface/cpg0016"
+        metadata_path: "data/metadata_cache"
+        git_clone_dir: "data/metadata_cache/cpg0016/datasets"
+      amlt:
+        data_path: "/mnt/data/cpg0016_huggingface"
+        metadata_path: "/mnt/data/metadata"
+        git_clone_dir: "datasets"
+
+    cpg-tgt2:
+      dataset_name: "cpg0016"
+      bit_depth: 8
+      split: "cpg-tgt2"
+      local:
+        data_path: "data/huggingface/cpg0016"
+        metadata_path: "data/metadata_cache"
+        git_clone_dir: "data/metadata_cache/cpg0016/datasets"
+      amlt:
+        data_path: "/mnt/data/cpg0016_huggingface"
+        metadata_path: "/mnt/data/metadata"
+        git_clone_dir: "datasets"
+
+    cpg-compound:
+      dataset_name: "cpg0016"
+      bit_depth: 8
+      split: "cpg-compound"
+      local:
+        data_path: "data/huggingface/cpg0016"
+        metadata_path: "data/metadata_cache"
+        git_clone_dir: "data/metadata_cache/cpg0016/datasets"
+      amlt:
+        data_path: "/mnt/data/cpg0016_huggingface"
+        metadata_path: "/mnt/data/metadata"
+        git_clone_dir: "datasets"
+
+    cpg-moa:
+      dataset_name: "cpg0016"
+      bit_depth: 8
+      split: "cpg-moa"
+      moa_labels_csv: "feature-extraction/configs/labeled_moa_samples.csv"
+      local:
+        data_path: "data/huggingface/cpg0016"
+        metadata_path: "data/metadata_cache"
+        git_clone_dir: "data/metadata_cache/cpg0016/datasets"
+      amlt:
+        data_path: "/mnt/data/cpg0016_huggingface"
+        metadata_path: "/mnt/data/metadata"
+        git_clone_dir: "datasets"
+
+    bbbc036:
+      dataset_name: "bbbc036"
+      bit_depth: 8
+      exclude_plates:
+        - "25503"
+      local:
+        data_path: "data/huggingface/bbbc036"
+        metadata_path: "data/metadata_cache"
+        git_clone_dir: null
+      amlt:
+        data_path: "/mnt/data/bbbc036_huggingface"
+        metadata_path: "/mnt/data/metadata"
+        git_clone_dir: null
+
+dataset:
+  name: "cpg0016"
+  bit_depth: 8
+  split: "cpg-tgt2"
+
+models:
+  dino_v2:
+    enabled: true
+    batch_size: 1024
+    num_workers: 4
+
+  dino_v2_448:
+    enabled: false
+    batch_size: 512
+    num_workers: 4
+
+  resnet:
+    enabled: true
+    batch_size: 1024
+    num_workers: 4
+
+  resnet_untrained:
+    enabled: true
+    batch_size: 1024
+    num_workers: 4
+    mixed_precision: false
+
+  vgg19:
+    enabled: false
+    batch_size: 512
+    num_workers: 4
+
+  open_phenom:
+    enabled: true
+    batch_size: 1280
+    num_workers: 4
+
+  cloome:
+    enabled: true
+    batch_size: 15
+    num_workers: 4
+    checkpoint: "feature-extraction/checkpoints/cloome-retrieval-zero-shot.pt"
+
+  subcell:
+    enabled: true
+    batch_size: 60
+    num_workers: 4
+    encoder_path: "feature-extraction/checkpoints/ER-DNA-Protein_MAE-CellS-ProtS-Pool.pth"
+
+patching:
+  enabled: false
+  num_patches: 4
+
+inference:
+  target_samples_per_save: 50000
+  mixed_precision: true
+  pin_memory: true
+  prefetch_factor: 2
+  staging_dir: null
+
+aggregation:
+  output_root:
+    local: "data/main_paper_inputs/aggregated"
+    amlt: "/mnt/cellpainting-features/MorphoBenchFeaturesAggregated/non-patch"

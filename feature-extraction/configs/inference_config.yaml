@@ -1,0 +1,93 @@
+# Feature Extraction Inference Configuration
+# ============================================
+# This YAML config controls which models to run, execution mode,
+# dataset selection, and per-model settings.
+
+# Execution mode: "local" or "amlt"
+execution:
+  mode: "local"
+
+# Local execution paths
+local:
+  data_path: "data/huggingface/cpg0016"
+  metadata_path: "feature-extraction/metadata"
+  output_path: "results/inference/cpg-crispr"
+  log_path: "logs"
+  git_clone_dir: "datasets"
+
+# AMLT execution settings
+amlt:
+  data_path: "/mnt/data/cpg0016_huggingface"
+  metadata_path: "feature-extraction/metadata"
+  output_path: "/mnt/cellpainting-features/cpg-crispr"
+  log_path: "logs"
+  git_clone_dir: "datasets"
+
+# Dataset configuration
+# split options for cpg0016:
+#   "cpg-crispr"   — plates where Metadata_PlateType == "CRISPR"       (148 plates)
+#   "cpg-tgt2"     — plates where Metadata_PlateType == "TARGET2"      (141 plates)
+#   "cpg-compound" — plates from source_5, source_9, source_11         (548 plates)
+dataset:
+  name: "cpg0016"
+  bit_depth: 8
+  split: "cpg-crispr"      # one of: cpg-crispr, cpg-tgt2, cpg-compound
+
+# Models to run inference for
+# Set enabled: true/false to select which models to run
+models:
+  dino_v2:
+    enabled: true
+    batch_size: 1024
+    num_workers: 4
+
+  resnet:
+    enabled: true
+    batch_size: 1024
+    num_workers: 4
+
+  resnet_untrained:
+    enabled: false
+    batch_size: 1024
+    num_workers: 4
+    mixed_precision: false
+
+  open_phenom:
+    enabled: true
+    batch_size: 1280
+    num_workers: 4
+    # Weights auto-downloaded from HuggingFace Hub (recursionpharma/OpenPhenom)
+
+  cloome:
+    enabled: false
+    batch_size: 15        # Must be multiple of 5 (5 channels per well)
+    num_workers: 4
+    # Path to CLOOME checkpoint (downloaded from HuggingFace)
+    # cloome-retrieval-zero-shot.pt — optimized for retrieval/MoA tasks
+    # cloome-retrieval-zero-shot.pt — optimized for activity prediction via linear probing
+    checkpoint: null
+
+  subcell:
+    enabled: false
+    batch_size: 60        # Must be multiple of 5 (5 channels per well)
+    num_workers: 4
+    # SubCell ybg (ER-DNA-Protein) encoder checkpoint
+    # Download from: https://virtualcellmodels.cziscience.com/
+    # Or use SubCellPortable: https://github.com/czi-ai/SubCellPortable
+    # Only the encoder.pth is needed (contains encoder + attention pooler weights)
+    encoder_path: null      # e.g. /path/to/models/ybg/mae_contrast_supcon_model/encoder.pth
+
+# Patching settings
+# When enabled, images are kept at original resolution and split into
+# non-overlapping patches (grid). Each patch is inferred independently
+# and embeddings are averaged.
+patching:
+  enabled: false          # true to activate patching for all models
+  num_patches: 4          # must be a perfect square (4, 9, 16, 25...)
+
+# Inference settings
+inference:
+  target_samples_per_save: 50000
+  mixed_precision: true
+  pin_memory: true
+  prefetch_factor: 2

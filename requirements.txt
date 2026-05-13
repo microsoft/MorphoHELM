@@ -1,0 +1,19 @@
+# Feature Extraction — Python Dependencies
+# ==========================================
+# Install: pip install -r requirements.txt
+# Note: torch/torchvision are expected from the AMLT base image.
+#       Only add them here if running outside AMLT.
+
+# Core
+numpy>=1.24
+pandas>=2.0
+pyyaml>=6.0
+Pillow>=9.0
+
+# ML frameworks (pinned to known-working versions)
+transformers>=4.40
+timm>=0.9
+datasets>=2.14
+
+# HuggingFace loader (local package)
+-e huggingface_loader/

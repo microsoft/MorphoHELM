@@ -1,0 +1,152 @@
+# Streamlined normalization config
+# ===============================
+# Main production profile:
+#   CSAll_Plate__PCA64__MADCtrl_Plate__NoSph
+#
+# Paper appendix profiles:
+#   CSAll_Plate__PCA64__MADCtrl_Plate__SphCtrl_Batch
+#   NoCS__PCA64__MADCtrl_Plate__NoSph
+#   CSAll_Plate__NoPCA__MADCtrl_Plate__NoSph
+#
+# Smoke profile:
+#   CSAll_Plate__PCA8__MADCtrl_Plate__NoSph
+
+execution:
+  mode: "local"
+
+aggregated_root:
+  local: "data/main_paper_inputs/aggregated"
+  amlt: "/mnt/cellpainting-features/MorphoBenchFeaturesAggregated/non-patch"
+
+normalized_root:
+  local: "data/main_paper_inputs/normalized"
+  amlt: "/mnt/cellpainting-features/MorphoBenchFeaturesNormalized/non-patch"
+
+metadata_root:
+  local: "data/main_paper_inputs"
+  amlt: "/mnt/data/metadata"
+
+min_controls_for_mad: 5
+min_controls_for_spherize: 20
+
+profiles:
+  CSAll_Plate__PCA64__MADCtrl_Plate__NoSph:
+    result_dir: "QC_CSAll_Plate__PCA64__MADCtrl_Plate__NoSph"
+    slug: "csall-plate-pca64-madctrl-plate-nosph"
+    centerscale:
+      enabled: true
+      scope: "plate"
+      position: "pre_pca"
+      fit_on: "all"
+    pca:
+      enabled: true
+      n_components: 64
+    mad:
+      scope: "plate"
+    spherize:
+      enabled: false
+
+  CSAll_Plate__PCA64__MADCtrl_Plate__SphCtrl_Batch:
+    result_dir: "QC_CSAll_Plate__PCA64__MADCtrl_Plate__SphCtrl_Batch"
+    slug: "csall-plate-pca64-madctrl-plate-sphctrl-batch"
+    centerscale:
+      enabled: true
+      scope: "plate"
+      position: "pre_pca"
+      fit_on: "all"
+    pca:
+      enabled: true
+      n_components: 64
+    mad:
+      scope: "plate"
+    spherize:
+      enabled: true
+      scope: "batch"
+
+  NoCS__PCA64__MADCtrl_Plate__NoSph:
+    result_dir: "QC_NoCS__PCA64__MADCtrl_Plate__NoSph"
+    slug: "nocs-pca64-madctrl-plate-nosph"
+    centerscale:
+      enabled: false
+      scope: "plate"
+      position: "none"
+      fit_on: "all"
+    pca:
+      enabled: true
+      n_components: 64
+    mad:
+      scope: "plate"
+    spherize:
+      enabled: false
+
+  CSAll_Plate__NoPCA__MADCtrl_Plate__NoSph:
+    result_dir: "QC_CSAll_Plate__NoPCA__MADCtrl_Plate__NoSph"
+    slug: "csall-plate-nopca-madctrl-plate-nosph"
+    centerscale:
+      enabled: true
+      scope: "plate"
+      position: "pre_pca"
+      fit_on: "all"
+    pca:
+      enabled: false
+      n_components: 0
+    mad:
+      scope: "plate"
+    spherize:
+      enabled: false
+
+  CSAll_Plate__PCA8__MADCtrl_Plate__NoSph:
+    result_dir: "QC_CSAll_Plate__PCA8__MADCtrl_Plate__NoSph"
+    slug: "csall-plate-pca8-madctrl-plate-nosph"
+    centerscale:
+      enabled: true
+      scope: "plate"
+      position: "pre_pca"
+      fit_on: "all"
+    pca:
+      enabled: true
+      n_components: 8
+    mad:
+      scope: "plate"
+    spherize:
+      enabled: false
+
+models:
+  - dino_v2_cls_token
+  - dino_v2_patch_token
+  - resnet
+  - resnet_untrained
+  - open_phenom
+  - cloome
+  - subcell
+
+splits:
+  cpg-crispr:
+    control_column: "Metadata_JCP2022"
+    control_value: "JCP2022_800001"
+    plate_column: "Metadata_Plate"
+    combined_metadata_path: "metadata/plate_metadata/metadata.parquet"
+
+  cpg-tgt2:
+    control_column: "Metadata_JCP2022"
+    control_value: "JCP2022_033924"
+    plate_column: "Metadata_Plate"
+    combined_metadata_path: "metadata/plate_metadata/metadata.parquet"
+
+  cpg-compound:
+    control_column: "Metadata_JCP2022"
+    control_value: "JCP2022_033924"
+    plate_column: "Metadata_Plate"
+    combined_metadata_path: "metadata/plate_metadata/metadata.parquet"
+
+  cpg-moa:
+    control_column: "Metadata_JCP2022"
+    control_value: "JCP2022_033924"
+    plate_column: "Metadata_Plate"
+    combined_metadata_path: "metadata/plate_metadata/metadata.parquet"
+
+  bbbc036:
+    control_column: "Metadata_ASSAY_WELL_ROLE"
+    control_value: "mock"
+    plate_column: "Metadata_Plate"
+    per_plate_metadata_glob: "data/metadata_cache/bbbc036/metadata/per_plate/*_metadata.parquet"

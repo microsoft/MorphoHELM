@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+# This name should match your package folder name
+name = "cellpainting_huggingface_loader"
+version = "0.1.0"
+description = "A utility for creating and managing dataset splits for microscopy image datasets."
+authors = [
+  { name = "Emre Hayir", email = "v-emrehayir@microsoft.com" },
+]
+license = { text = "MIT" }
+requires-python = ">=3.10"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+]
+
+# --- Dependencies ---
+dependencies = [
+    "numpy",
+    "pandas",
+    "opencv-python-headless",
+    "datasets",
+    "pyarrow",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]

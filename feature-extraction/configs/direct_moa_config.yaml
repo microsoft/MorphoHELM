@@ -1,0 +1,75 @@
+# Direct Inference Config — CPG0016 MoA compounds only (raw PNGs)
+# ================================================================
+# Used by: run_inference_direct.py
+# Loads corrected raw PNG images directly from a local or mounted image root.
+# Pre-filters to MOA compounds + controls (~525K FOVs vs ~2.2M total)
+# Output: <output_path>/<model_name>/
+
+execution:
+  mode: "local"
+
+local:
+  data_path: null
+  metadata_path: "feature-extraction/metadata"
+  output_path: "results/inference/cpg-moa-direct"
+  log_path: "logs"
+  git_clone_dir: null
+
+amlt:
+  data_path: "/mnt/data/cpg0016_huggingface"
+  metadata_path: "feature-extraction/metadata"
+  output_path: "/mnt/cellpainting-features/MorphoBenchFeatures/non-patch/cpg-moa-direct"
+  log_path: "logs"
+  git_clone_dir: null
+
+# Direct-mode specific: root directory for raw PNG images
+# Paths in metadata.parquet are relative (e.g., "1053597837/A01_i1_ch0.png")
+# The image root should contain plate directories at its top level.
+direct:
+  image_root: "data/corrected_images/cpg0016"
+
+dataset:
+  name: "cpg0016"
+  bit_depth: 8
+  moa_labels_csv: "feature-extraction/configs/labeled_moa_samples.csv"
+
+models:
+  dino_v2:
+    enabled: true
+    batch_size: 1024
+    num_workers: 4
+
+  resnet:
+    enabled: true
+    batch_size: 1024
+    num_workers: 4
+
+  resnet_untrained:
+    enabled: true
+    batch_size: 1024
+    num_workers: 4
+    mixed_precision: false
+
+  open_phenom:
+    enabled: true
+    batch_size: 1280
+    num_workers: 4
+
+  cloome:
+    enabled: true
+    batch_size: 160
+    num_workers: 8
+    checkpoint: "feature-extraction/checkpoints/cloome-retrieval-zero-shot.pt"
+
+  subcell:
+    enabled: true
+    batch_size: 160
+    num_workers: 8
+    encoder_path: "feature-extraction/checkpoints/ER-DNA-Protein_MAE-CellS-ProtS-Pool.pth"
+
+inference:
+  target_samples_per_save: 50000
+  mixed_precision: true
+  pin_memory: true
+  prefetch_factor: 2
+  staging_dir: null

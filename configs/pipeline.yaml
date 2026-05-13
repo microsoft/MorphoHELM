@@ -1,0 +1,24 @@
+# MorphoHELM stage order and default config files.
+
+stages:
+  - data_installation
+  - preprocess
+  - raw_to_huggingface
+  - inference
+  - aggregate
+  - normalize
+  - qc
+  - benchmarks
+  - generate_graphs
+
+configs:
+  data_installation: "configs/data_installation.yaml"
+  inference: "configs/inference_splits.yaml"
+  normalization: "configs/normalize_splits.yaml"
+  paper_graphs: "configs/paper_graphs.yaml"
+
+data:
+  normalized_root: "data/main_paper_inputs/normalized"
+  support_metadata_root: "data/main_paper_inputs/metadata"
+  qc_root: "data/qc"
+  enrichment_root: "data/enrichment"

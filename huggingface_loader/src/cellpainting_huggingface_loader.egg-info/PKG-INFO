@@ -1,0 +1,14 @@
+Metadata-Version: 2.4
+Name: cellpainting_huggingface_loader
+Version: 0.1.0
+Summary: A utility for creating and managing dataset splits for microscopy image datasets.
+Author-email: Emre Hayir <v-emrehayir@microsoft.com>
+License: MIT
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.10
+Requires-Python: >=3.10
+Requires-Dist: numpy
+Requires-Dist: pandas
+Requires-Dist: opencv-python
+Requires-Dist: datasets
+Requires-Dist: pyarrow

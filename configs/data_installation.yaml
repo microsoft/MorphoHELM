@@ -1,0 +1,27 @@
+# Data installation defaults for MorphoHELM.
+#
+# The installer is CLI-first; this file documents the intended local layout and
+# can be used by downstream wrappers.
+
+metadata_root: "data/metadata_cache"
+
+cpg0016:
+  output_root: "data/corrected_images/cpg0016"
+  metadata_repo: null
+  plates: []
+  workers: 16
+  keep_raw: false
+
+bbbc036:
+  output_root: "data/corrected_images/bbbc036"
+  ground_truth_csv: null
+  illum_root: null
+  raw_unzipped_root: null
+  plates: []
+  workers: 16
+  keep_archives: false
+
+smoke:
+  max_plates: 1
+  max_wells: 1
+  max_images_per_channel: 1
