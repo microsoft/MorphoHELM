@@ -680,22 +680,71 @@ resnet_untrained_normalized.parquet
 subcell_normalized.parquet
 ```
 
-Benchmarks and their current scripts:
+Benchmarks are organized by benchmark family:
+
+```text
+benchmarks/enrichment/
+benchmarks/replicate_analysis/
+```
+
+The default benchmark sweep config is:
+
+```text
+configs/benchmarks.yaml
+```
+
+Users can choose which benchmarks to run in the config or through
+`--benchmarks`. The kNN/mAP restrictions are intentionally **not configurable**:
+when a kNN, standard mAP, or negative-control mAP benchmark is enabled, all
+supported restrictions are run for both `cpg-tgt2` and `cpg-compound`.
+
+Benchmark inventory:
 
 | Paper output | Dataset(s) | Metrics / restrictions | Script(s) |
 |---|---|---|---|
-| MoA enrichment heatmap | `bbbc036`, `cpg-moa` | fraction significant and geometric mean OR; BBBC036 NR; cpg-MoA NR, NSB, NSS | `benchmarks/run_bbbc036_enrichment_sweep.py`, `benchmarks/enrichment/moa/build_moa_profiles.py`, `benchmarks/run_moa_sweep.py` |
-| CRISPR pathway enrichment heatmap | `cpg-crispr` | fraction significant and geometric mean OR; NR and NSB; databases CORUM, HuMAP, REACTOME, SIGNOR, StringDB | `benchmarks/enrichment/crispr/run_crispr_enrichment.py` |
+| MoA enrichment heatmap | `bbbc036`, `cpg-moa` | fraction significant and geometric mean OR; BBBC036 NR; cpg-MoA NR, NSB, NSS | `benchmarks/enrichment/run_enrichment_sweep.py`, `benchmarks/enrichment/bbbc036_moa/run_bbbc036_moa.py`, `benchmarks/enrichment/cpg_moa/` |
+| CRISPR pathway enrichment heatmap | `cpg-crispr` | fraction significant and geometric mean OR; NR and NSB; databases CORUM, HuMAP, REACTOME, SIGNOR, StringDB | `benchmarks/enrichment/run_enrichment_sweep.py`, `benchmarks/enrichment/crispr/run_crispr_enrichment.py` |
 | Per-database CRISPR bar plot | `cpg-crispr` | same CRISPR metrics, shown separately per database | `paper/Cellprofiling_Benchmark/scripts/plot_crispr_database_barplot.py` |
-| kNN replicate retrieval heatmap | `cpg-tgt2`, `cpg-compound` | Recall@1 and mAP; NR, NSB, NSS, NSL | `benchmarks/run_knn_sweep.py` |
-| Negative-control mAP appendix heatmap | `cpg-tgt2`, `cpg-compound` | DMSO distractors plus same-compound positives; NR, NSB, NSS, NSL | `benchmarks/run_negative_control_map.py` |
+| kNN replicate retrieval heatmap | `cpg-tgt2`, `cpg-compound` | Recall@1; all fixed restrictions | `benchmarks/replicate_analysis/run_replicate_analysis_sweep.py`, `benchmarks/replicate_analysis/knn_replicate.py` |
+| Standard replicate mAP heatmap | `cpg-tgt2`, `cpg-compound` | mAP; all fixed restrictions | `benchmarks/replicate_analysis/run_replicate_analysis_sweep.py`, `benchmarks/replicate_analysis/replicate_map.py` |
+| Negative-control mAP appendix heatmap | `cpg-tgt2`, `cpg-compound` | DMSO distractors plus same-compound positives; all fixed restrictions | `benchmarks/replicate_analysis/run_replicate_analysis_sweep.py`, `benchmarks/replicate_analysis/negative_control_map.py` |
 | Normalization/post-processing appendix heatmaps | same benchmark datasets | MoA, CRISPR, and kNN heatmaps for three additional normalization profiles | `paper/Cellprofiling_Benchmark/scripts/generate_paper_graphs.py`, `paper/Cellprofiling_Benchmark/scripts/export_qc_heatmap_dat.py` |
 | Discovery-set Jaccard appendix heatmaps | `bbbc036`, `cpg-moa`, `cpg-crispr` | pairwise Jaccard over least-restrictive significant compounds/genes | `paper/Cellprofiling_Benchmark/scripts/export_jaccard_dat.py` |
-| Haldane-Anscombe OR diagnostic | BBBC036 MoA result pickles | old imputation vs corrected OR distribution | `benchmarks/enrichment/moa/plot_moa_pooled_or_skewness.py` |
+| Haldane-Anscombe OR diagnostic | BBBC036 MoA result pickles | old imputation vs corrected OR distribution | `benchmarks/enrichment/cpg_moa/plot_moa_pooled_or_skewness.py` |
 
 The discrimination-score figure block is commented out in
 `paper/Cellprofiling_Benchmark/main.tex`; it is not part of the active paper
 figure set.
+
+Run all configured enrichment benchmarks:
+
+```bash
+python benchmarks/enrichment/run_enrichment_sweep.py \
+  --config configs/benchmarks.yaml
+```
+
+Run selected enrichment benchmarks:
+
+```bash
+python benchmarks/enrichment/run_enrichment_sweep.py \
+  --config configs/benchmarks.yaml \
+  --benchmarks crispr,cpg_moa,bbbc036_moa
+```
+
+Run all configured replicate-analysis benchmarks:
+
+```bash
+python benchmarks/replicate_analysis/run_replicate_analysis_sweep.py \
+  --config configs/benchmarks.yaml
+```
+
+Run selected replicate-analysis benchmarks:
+
+```bash
+python benchmarks/replicate_analysis/run_replicate_analysis_sweep.py \
+  --config configs/benchmarks.yaml \
+  --benchmarks knn_replicate,map,negcon_map
+```
 
 ## 9. Generate graphs
 
@@ -735,7 +784,14 @@ python paper/Cellprofiling_Benchmark/scripts/generate_paper_graphs.py \
   --run-normalization
 ```
 
-The wrapper runs:
+The wrapper delegates benchmark computation to:
+
+```text
+benchmarks/enrichment/run_enrichment_sweep.py
+benchmarks/replicate_analysis/run_replicate_analysis_sweep.py
+```
+
+Together these run:
 
 1. cpg-MoA profile construction;
 2. BBBC036 MoA enrichment with permutation-style p-values;

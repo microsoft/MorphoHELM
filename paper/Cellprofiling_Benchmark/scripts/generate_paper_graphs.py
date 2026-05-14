@@ -146,131 +146,62 @@ def run_normalization(profile: dict[str, str], config: dict[str, Any], results_r
 
 def run_benchmarks(profile: dict[str, str], features_dir: Path, config: dict[str, Any], dry_run: bool) -> None:
     paths = config["paths"]
-    metadata = paths["metadata"]
     results_root = resolve_path(paths["results_root"])
     result_dir = results_root / profile["result_dir"]
-    cpg_override_dir = results_root / f"{profile['result_dir']}_cpg_all_eligible"
-    negative_dir = results_root / f"{profile['result_dir']}_negative_control_map"
     result_dir.mkdir(parents=True, exist_ok=True)
-    cpg_override_dir.mkdir(parents=True, exist_ok=True)
     n_resamples = str(config["benchmarks"].get("n_resamples", 100))
-    qc = qc_args(config)
     run_flags = config.get("benchmarks", {}).get("run", {})
 
-    if run_flags.get("moa", True):
-        run_cmd(
-            [
-                sys.executable,
-                str(ROOT / "benchmarks" / "enrichment" / "moa" / "build_moa_profiles.py"),
-                "--normalized-dir",
-                str(features_dir / "cpg-moa"),
-                "--moa-labels",
-                str(resolve_path(metadata["moa_labels"])),
-                "--plate-metadata",
-                str(resolve_path(metadata["cpg_plate_metadata"])),
-                "--output",
-                str(result_dir / "moa_cross_source_profiles.pkl"),
-                *qc,
-            ],
-            dry_run=dry_run,
-        )
-        run_cmd(
-            [
-                sys.executable,
-                str(ROOT / "benchmarks" / "run_bbbc036_enrichment_sweep.py"),
-                "--features-dir",
-                str(features_dir / "bbbc036"),
-                "--metadata",
-                str(resolve_path(metadata["bbbc036_metadata"])),
-                "--output",
-                str(result_dir / "bbbc036_moa_enrichment.pkl"),
-                "--n-resamples",
-                n_resamples,
-                *qc,
-            ],
-            dry_run=dry_run,
-        )
-        run_cmd(
-            [
-                sys.executable,
-                str(ROOT / "benchmarks" / "run_moa_sweep.py"),
-                "--profiles",
-                str(result_dir / "moa_cross_source_profiles.pkl"),
-                "--output",
-                str(result_dir / "moa_enrichment_results.pkl"),
-                "--bbbc-results",
-                str(result_dir / "bbbc036_moa_enrichment.pkl"),
-            ],
-            dry_run=dry_run,
-        )
-
+    enrichment = []
     if run_flags.get("crispr", True):
-        for mode in ["no_restriction", "not_same_batch"]:
-            run_cmd(
-                [
-                    sys.executable,
-                    str(ROOT / "benchmarks" / "enrichment" / "crispr" / "run_crispr_enrichment.py"),
-                    "--features-dir",
-                    str(features_dir / "cpg-crispr"),
-                    "--mode",
-                    mode,
-                    "--n_resamples",
-                    n_resamples,
-                    "--stringdb",
-                    str(resolve_path(metadata["stringdb"])),
-                    "--output",
-                    str(result_dir / f"crispr_enrichment_{mode}.pkl"),
-                    *qc,
-                ],
-                dry_run=dry_run,
-            )
-
-    if run_flags.get("knn", True):
+        enrichment.append("crispr")
+    if run_flags.get("cpg_moa", run_flags.get("moa", True)):
+        enrichment.append("cpg_moa")
+    if run_flags.get("bbbc036_moa", run_flags.get("moa", True)):
+        enrichment.append("bbbc036_moa")
+    if enrichment:
         run_cmd(
             [
                 sys.executable,
-                str(ROOT / "benchmarks" / "run_knn_sweep.py"),
+                str(ROOT / "benchmarks" / "enrichment" / "run_enrichment_sweep.py"),
+                "--config",
+                str(config["_config_path"]),
+                "--profile",
+                profile["name"],
+                "--benchmarks",
+                ",".join(enrichment),
                 "--features-base",
                 str(features_dir),
                 "--results-dir",
                 str(result_dir),
-                "--only-dataset",
-                "both",
-                "--cpg-compound-selection",
-                "sample10k",
-                *qc,
-            ],
-            dry_run=dry_run,
-        )
-        run_cmd(
-            [
-                sys.executable,
-                str(ROOT / "benchmarks" / "run_knn_sweep.py"),
-                "--features-base",
-                str(features_dir),
-                "--results-dir",
-                str(cpg_override_dir),
-                "--only-dataset",
-                "cpg-compound",
-                "--cpg-compound-selection",
-                "all_eligible",
-                *qc,
+                "--n-resamples",
+                n_resamples,
             ],
             dry_run=dry_run,
         )
 
-    if run_flags.get("negative_control_map", True):
+    replicate = []
+    if run_flags.get("knn_replicate", run_flags.get("knn", True)):
+        replicate.append("knn_replicate")
+    if run_flags.get("map", run_flags.get("knn", True)):
+        replicate.append("map")
+    if run_flags.get("negcon_map", run_flags.get("negative_control_map", True)):
+        replicate.append("negcon_map")
+    if replicate:
         run_cmd(
             [
                 sys.executable,
-                str(ROOT / "benchmarks" / "run_negative_control_map.py"),
+                str(ROOT / "benchmarks" / "replicate_analysis" / "run_replicate_analysis_sweep.py"),
+                "--config",
+                str(config["_config_path"]),
+                "--profile",
+                profile["name"],
+                "--benchmarks",
+                ",".join(replicate),
                 "--features-base",
                 str(features_dir),
                 "--results-dir",
-                str(negative_dir),
-                "--selection-pickle",
-                str(cpg_override_dir / "knn_cpg_compound_all_eligible.pkl"),
-                *qc,
+                str(result_dir),
             ],
             dry_run=dry_run,
         )
@@ -469,6 +400,7 @@ def main() -> None:
     args = parser.parse_args()
 
     config = load_yaml(resolve_path(args.config))
+    config["_config_path"] = str(resolve_path(args.config))
     if args.normalized_root:
         config["paths"]["normalized_root"] = str(args.normalized_root)
     if args.results_root:

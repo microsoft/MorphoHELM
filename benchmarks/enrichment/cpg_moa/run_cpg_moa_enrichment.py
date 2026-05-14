@@ -288,23 +288,25 @@ def plot_heatmap(cpjump_summary):
     """Plot the combined BBBC036 + cpg-MoA enrichment heatmap matching the original style."""
     import matplotlib.gridspec as gridspec
 
-    # Load BBBC036 results
-    print("Loading BBBC036 results...")
-    with open(BBBC_RESULTS_PATH, "rb") as f:
-        bbbc_results = pickle.load(f)
-
     BBBC_NAME_MAP = {
         "dino_v2_cls_token": "dino_v2_cls",
         "dino_v2_patch_token": "dino_v2_patch",
     }
-    for bbbc_key, r in bbbc_results.items():
-        canonical = BBBC_NAME_MAP.get(bbbc_key, bbbc_key)
-        if canonical in ALL_MODELS:
-            geom_or = r.get('geometric_mean_odds', r.get('geometric_mean_or'))
-            cpjump_summary[(canonical, 'BBBC036')] = {
-                'frac_sig': r['fraction_significant'],
-                'geom_or': geom_or,
-            }
+    bbbc_path = Path(BBBC_RESULTS_PATH)
+    if bbbc_path.exists():
+        print("Loading BBBC036 results...")
+        with bbbc_path.open("rb") as f:
+            bbbc_results = pickle.load(f)
+        for bbbc_key, r in bbbc_results.items():
+            canonical = BBBC_NAME_MAP.get(bbbc_key, bbbc_key)
+            if canonical in ALL_MODELS:
+                geom_or = r.get('geometric_mean_odds', r.get('geometric_mean_or'))
+                cpjump_summary[(canonical, 'BBBC036')] = {
+                    'frac_sig': r['fraction_significant'],
+                    'geom_or': geom_or,
+                }
+    else:
+        print(f"BBBC036 MoA results not found at {bbbc_path}; plotting cpg-MoA only.")
 
     cpg_keys = ['CPJump-Global', 'CPJump-Not Same Batch', 'CPJump-Not Same Source']
     bbbc_col_labels = ['No Restriction']

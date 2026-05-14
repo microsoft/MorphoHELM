@@ -1,0 +1,53 @@
+# Config-driven benchmark sweeps.
+# Paths are resolved relative to the repository root unless absolute.
+
+paths:
+  normalized_root: "data/main_paper_inputs/normalized"
+  results_root: "results/benchmarks"
+  metadata:
+    moa_labels: "feature-extraction/configs/labeled_moa_samples.csv"
+    cpg_plate_metadata: "feature-extraction/metadata/metadata.parquet"
+    bbbc036_metadata: "data/main_paper_inputs/metadata/bbbc036_metadata.parquet"
+    stringdb: "data/enrichment/protein_databases/StringDB.parquet"
+    corum: "data/enrichment/protein_databases/CORUM.parquet"
+    humap: "data/enrichment/protein_databases/HuMAP.parquet"
+    reactome: "data/enrichment/protein_databases/REACTOME.parquet"
+    signor: "data/enrichment/protein_databases/SIGNOR.parquet"
+  qc_cell_counts_dir: "data/qc/cell_counts"
+
+profiles:
+  default: "CSAll_Plate__PCA64__MADCtrl_Plate__NoSph"
+
+models:
+  - "cellprofiler"
+  - "cloome"
+  - "dino_v2_cls_token"
+  - "dino_v2_patch_token"
+  - "open_phenom"
+  - "resnet"
+  - "resnet_untrained"
+  - "subcell"
+
+qc:
+  enabled: true
+  cell_count_cutoff: 0.05
+  sample_wells: 5000
+  seed: 42
+
+enrichment:
+  enabled: true
+  n_resamples: 100
+  run:
+    crispr: true
+    cpg_moa: true
+    bbbc036_moa: true
+
+replicate_analysis:
+  enabled: true
+  run:
+    knn_replicate: true
+    map: true
+    negcon_map: true
+  cpg_compound_selection:
+    main: "sample10k"
+    all_eligible_for_negcon: true
