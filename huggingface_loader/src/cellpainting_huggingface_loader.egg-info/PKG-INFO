@@ -9,6 +9,6 @@ Classifier: Programming Language :: Python :: 3.10
 Requires-Python: >=3.10
 Requires-Dist: numpy
 Requires-Dist: pandas
-Requires-Dist: opencv-python
+Requires-Dist: opencv-python-headless
 Requires-Dist: datasets
 Requires-Dist: pyarrow

@@ -746,6 +746,47 @@ python benchmarks/replicate_analysis/run_replicate_analysis_sweep.py \
   --benchmarks knn_replicate,map,negcon_map
 ```
 
+For targeted smoke validation, benchmark CLIs expose model and dataset subsets
+without changing production defaults. These options are intended to reduce local
+validation time; omit them for paper reproduction.
+
+```bash
+# One-model cpg-tgt2 kNN + standard mAP smoke.
+python benchmarks/replicate_analysis/run_replicate_analysis_sweep.py \
+  --config configs/benchmarks.yaml \
+  --benchmarks knn_replicate,map \
+  --only-dataset cpg-tgt2 \
+  --models cellprofiler
+
+# One-model CRISPR permutation smoke. Permutation p-values are the default;
+# pass --exact-hypergeom only when exact hypergeometric p-values are desired.
+python benchmarks/enrichment/crispr/run_crispr_enrichment.py \
+  --features-dir data/main_paper_inputs/normalized/CSAll_Plate__PCA64__MADCtrl_Plate__NoSph/cpg-crispr \
+  --models resnet \
+  --mode no_restriction \
+  --n_resamples 2 \
+  --output results/validation_smoke/enrichment/crispr_enrichment_no_restriction.pkl
+
+# One-model negative-control mAP smoke.
+python benchmarks/replicate_analysis/negative_control_map.py \
+  --features-base data/main_paper_inputs/normalized/CSAll_Plate__PCA64__MADCtrl_Plate__NoSph \
+  --results-dir results/validation_smoke/negative_control_map_tgt2 \
+  --models cellprofiler \
+  --only-dataset cpg-tgt2
+```
+
+cpg-MoA also supports bounded smoke execution through
+`benchmarks/enrichment/cpg_moa/run_cpg_moa.py`:
+
+```bash
+python benchmarks/enrichment/cpg_moa/run_cpg_moa.py \
+  --profiles results/validation_smoke/enrichment/moa_cross_source_profiles.pkl \
+  --output results/validation_smoke/enrichment/moa_enrichment_results.pkl \
+  --n-resamples 2 \
+  --max-batches 2 \
+  --max-sources 2
+```
+
 ## 9. Generate graphs
 
 Paper graph regeneration is configured through:
@@ -813,6 +854,11 @@ python paper/Cellprofiling_Benchmark/scripts/generate_paper_graphs.py \
   --profiles all \
   --only-export-graphs
 ```
+
+This export-only mode requires a complete benchmark result directory containing
+the expected files such as `moa_enrichment_results.pkl`, `knn_results.pkl`,
+`negative_control_map.pkl`, and the CRISPR/BBBC036 enrichment pickles. Use
+`--mock` when validating graph-export wiring without those full results.
 
 Preview commands without executing them:
 

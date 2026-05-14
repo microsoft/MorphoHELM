@@ -60,3 +60,6 @@ feature-extraction/test_output*/
 
 # Notebook checkpoints
 .ipynb_checkpoints/
+
+# Paper
+paper/

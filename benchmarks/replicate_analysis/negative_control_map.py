@@ -89,8 +89,20 @@ parser.add_argument(
     default=DEFAULT_CHUNK_SIZE,
     help="Number of query compounds per similarity chunk.",
 )
+parser.add_argument("--models", nargs="+", help="Optional model subset for smoke validation; defaults to all models.")
+parser.add_argument(
+    "--only-dataset",
+    choices=["both", "cpg-tgt2", "cpg-compound"],
+    default="both",
+    help="Run both panels or only one dataset panel for smoke validation.",
+)
 add_cell_count_qc_args(parser)
 args = parser.parse_args()
+if args.models:
+    unknown_models = sorted(set(args.models) - set(MODELS))
+    if unknown_models:
+        raise ValueError(f"Unknown models: {unknown_models}")
+    MODELS = {model: MODELS[model] for model in args.models}
 
 FEATURES_BASE = args.features_base
 RESULTS_DIR = args.results_dir
@@ -473,12 +485,25 @@ def run_dataset(dataset_name: str, selected_set: set[str] | None = None) -> tupl
 def main() -> None:
     os.makedirs(RESULTS_DIR, exist_ok=True)
 
-    selected_compounds = load_selected_cpg_compounds()
+    selected_compounds = (
+        load_selected_cpg_compounds()
+        if args.only_dataset in {"both", "cpg-compound"}
+        else []
+    )
     selected_set = set(selected_compounds)
-    print(f"Selected cpg-compound compounds: {len(selected_compounds)}", flush=True)
+    if selected_compounds:
+        print(f"Selected cpg-compound compounds: {len(selected_compounds)}", flush=True)
 
-    tgt2_results, tgt2_well_counts = run_dataset("cpg-tgt2")
-    cpg_results, cpg_well_counts = run_dataset("cpg-compound", selected_set)
+    tgt2_results, tgt2_well_counts = (
+        run_dataset("cpg-tgt2")
+        if args.only_dataset in {"both", "cpg-tgt2"}
+        else ({}, {})
+    )
+    cpg_results, cpg_well_counts = (
+        run_dataset("cpg-compound", selected_set)
+        if args.only_dataset in {"both", "cpg-compound"}
+        else ({}, {})
+    )
 
     negative_control_candidate_counts = {
         "cpg-tgt2": {

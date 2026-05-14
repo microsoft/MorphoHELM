@@ -272,7 +272,7 @@ def export_graphs(profiles: list[dict[str, str]], config: dict[str, Any], dry_ru
             run_cmd(
                 [
                     sys.executable,
-                    str(ROOT / "benchmarks" / "enrichment" / "moa" / "plot_moa_pooled_or_skewness.py"),
+                    str(ROOT / "benchmarks" / "enrichment" / "cpg_moa" / "plot_moa_pooled_or_skewness.py"),
                     "--old-path",
                     str(old_path),
                     "--haldane-path",

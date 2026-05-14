@@ -36,6 +36,8 @@ OUTPUT_PNG = str(BASE / "results" / "enrichment" / "cpjump_enrichment_heatmap.pn
 CUTOFF_FRACTION = 0.01
 N_RESAMPLES = 100
 RANDOM_STATE = 61
+MAX_BATCHES = None
+MAX_SOURCES = None
 
 # Canonical model order (all 8)
 ALL_MODELS = [
@@ -125,59 +127,65 @@ def run_enrichment(query_df, comparison_df=None, pc_cols=None, cutoff_fraction=C
 
     query_features = query_df[pc_cols].values
     comp_features = comparison_df[pc_cols].values
-    sim_matrix = cosine_similarity(query_features, comp_features)
-
     query_compounds = query_df['Metadata_JCP2022'].values
     query_moas = query_df['Metadata_MoA'].values
     comp_compounds = comparison_df['Metadata_JCP2022'].values
     comp_moas = comparison_df['Metadata_MoA'].values
+    unique_compounds, comp_codes = np.unique(comp_compounds, return_inverse=True)
+    sort_idx = np.argsort(comp_codes, kind="stable")
+    sorted_codes = comp_codes[sort_idx]
+    starts = np.r_[0, np.flatnonzero(np.diff(sorted_codes)) + 1]
+    unique_order = sorted_codes[starts]
+    unique_compounds = unique_compounds[unique_order]
+    unique_moas = comp_moas[sort_idx[starts]]
 
     odds, pvals = [], []
     processed_comp, significant_comp = [], []
     cutoff_items, unique_candidate_counts = [], []
 
-    for i in range(len(query_df)):
-        query_moa = query_moas[i]
-        query_compound = query_compounds[i]
-        seen_compounds = set()
-        ranked_compounds = []
-        moa_matches = []
+    chunk_size = 512
+    for chunk_start in range(0, len(query_df), chunk_size):
+        chunk_end = min(chunk_start + chunk_size, len(query_df))
+        sim_matrix = cosine_similarity(query_features[chunk_start:chunk_end], comp_features)
+        max_by_compound = np.maximum.reduceat(sim_matrix[:, sort_idx], starts, axis=1)
 
-        for comp_idx in np.argsort(sim_matrix[i])[::-1]:
-            compound = comp_compounds[comp_idx]
-            if compound == query_compound or compound in seen_compounds:
+        for local_i, i in enumerate(range(chunk_start, chunk_end)):
+            query_moa = query_moas[i]
+            query_compound = query_compounds[i]
+            candidate_mask = unique_compounds != query_compound
+            candidate_scores = max_by_compound[local_i, candidate_mask]
+            candidate_moas = unique_moas[candidate_mask]
+            candidate_compounds = unique_compounds[candidate_mask]
+
+            n_unique_candidates = len(candidate_compounds)
+            if cutoff_items_override is None:
+                cutoff = max(1, int(n_unique_candidates * cutoff_fraction))
+            else:
+                cutoff = max(1, int(cutoff_items_override))
+            if n_unique_candidates < cutoff + 1:
                 continue
-            seen_compounds.add(compound)
-            ranked_compounds.append(compound)
-            moa_matches.append(int(comp_moas[comp_idx] == query_moa))
 
-        n_unique_candidates = len(ranked_compounds)
-        if cutoff_items_override is None:
-            cutoff = max(1, int(n_unique_candidates * cutoff_fraction))
-        else:
-            cutoff = max(1, int(cutoff_items_override))
-        if n_unique_candidates < cutoff + 1:
-            continue
+            ranked_idx = np.argsort(candidate_scores)[::-1]
+            moa_matches = (candidate_moas[ranked_idx] == query_moa).astype(np.int8)
+            if int(moa_matches.sum()) == 0:
+                continue
 
-        if sum(moa_matches) == 0:
-            continue
+            target = moa_matches[:cutoff]
+            background = moa_matches[cutoff:]
+            target_compounds = candidate_compounds[ranked_idx[:cutoff]]
+            if query_compound in target_compounds:
+                raise AssertionError("Query compound found in enrichment target")
+            if len(target_compounds) != len(set(target_compounds)):
+                raise AssertionError("Duplicate compound found in enrichment target")
 
-        target = moa_matches[:cutoff]
-        background = moa_matches[cutoff:]
-        target_compounds = ranked_compounds[:cutoff]
-        if query_compound in target_compounds:
-            raise AssertionError("Query compound found in enrichment target")
-        if len(target_compounds) != len(set(target_compounds)):
-            raise AssertionError("Duplicate compound found in enrichment target")
-
-        odds_ratio, pvalue = permutation_pvalue(target, background)
-        odds.append(odds_ratio)
-        pvals.append(pvalue)
-        processed_comp.append(query_compound)
-        cutoff_items.append(cutoff)
-        unique_candidate_counts.append(n_unique_candidates)
-        if pvalue < 0.05:
-            significant_comp.append(query_compound)
+            odds_ratio, pvalue = permutation_pvalue(target, background)
+            odds.append(odds_ratio)
+            pvals.append(pvalue)
+            processed_comp.append(query_compound)
+            cutoff_items.append(cutoff)
+            unique_candidate_counts.append(n_unique_candidates)
+            if pvalue < 0.05:
+                significant_comp.append(query_compound)
 
     n_processed = len(odds)
     log_odds = [np.log(o) for o in odds if o > 0]
@@ -427,13 +435,13 @@ def main():
     with open(DATA_PATH, "rb") as f:
         moa_profiles = pickle.load(f)
 
-    pc_cols = [c for c in moa_profiles['openphenom'].columns if c.startswith('PC') or c.startswith('F_')]
+    ref_model = next(iter(moa_profiles))
+    pc_cols = [c for c in moa_profiles[ref_model].columns if c.startswith('PC') or c.startswith('F_')]
     print(f"Models: {list(moa_profiles.keys())}, PC cols: {len(pc_cols)}")
 
     # Apply subset filter
     print("\nApplying subset filtering...")
     moa_profiles = apply_subset_filter(moa_profiles)
-    ref_model = next(iter(moa_profiles))
     ref_agg = aggregate_by_compound(moa_profiles[ref_model], pc_cols)
     cpjump_cutoff_items = max(1, int((len(ref_agg) - 1) * CUTOFF_FRACTION))
     print(f"Using single CPJump cutoff: {cpjump_cutoff_items} "
@@ -457,7 +465,10 @@ def main():
     for model, df in moa_profiles.items():
         print(f"  {model}...")
         within_source_results[model] = {}
-        for source in sorted(df['Metadata_Source'].unique()):
+        sources = sorted(df['Metadata_Source'].unique())
+        if MAX_SOURCES is not None:
+            sources = sources[:MAX_SOURCES]
+        for source in sources:
             source_df = df[df['Metadata_Source'] == source]
             agg = aggregate_by_compound(source_df, pc_cols)
             if len(agg) < 3:
@@ -475,6 +486,8 @@ def main():
         print(f"  {model}...")
         not_same_batch_results[model] = {}
         batches = sorted(df['Metadata_Batch'].unique())
+        if MAX_BATCHES is not None:
+            batches = batches[:MAX_BATCHES]
         for batch in tqdm(batches, desc=f"    {model}", leave=False):
             query_df = df[df['Metadata_Batch'] == batch]
             comp_df = df[df['Metadata_Batch'] != batch]
@@ -493,7 +506,10 @@ def main():
     for model, df in moa_profiles.items():
         print(f"  {model}...")
         not_same_source_results[model] = {}
-        for source in sorted(df['Metadata_Source'].unique()):
+        sources = sorted(df['Metadata_Source'].unique())
+        if MAX_SOURCES is not None:
+            sources = sources[:MAX_SOURCES]
+        for source in sources:
             query_df = df[df['Metadata_Source'] == source]
             comp_df = df[df['Metadata_Source'] != source]
             if len(query_df) == 0 or comp_df['Metadata_JCP2022'].nunique() < 3:
@@ -508,6 +524,8 @@ def main():
     # ── Build summary ────────────────────────────────────────────────────
     cpjump_summary = {}
     for cpjump_name, canonical in CPJUMP_TO_CANONICAL.items():
+        if cpjump_name not in global_results:
+            continue
         # Global
         r = global_results[cpjump_name]
         cpjump_summary[(canonical, 'CPJump-Global')] = {

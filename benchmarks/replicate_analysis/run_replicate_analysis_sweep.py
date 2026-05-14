@@ -43,6 +43,7 @@ parser.add_argument("--benchmarks", default=None, help="Comma-separated subset: 
 parser.add_argument("--features-base", default=None, help="Base dir with {dataset}/ subdirs of normalized parquets")
 parser.add_argument("--results-dir", default=None, help="Output dir for results pkl")
 parser.add_argument("--dry-run", action="store_true", help="Print resolved actions without running benchmarks")
+parser.add_argument("--models", nargs="+", help="Optional model subset for smoke validation; defaults to all models")
 parser.add_argument(
     "--only-dataset",
     choices=["both", "cpg-tgt2", "cpg-compound"],
@@ -103,6 +104,11 @@ MODELS = {
     'resnet_untrained':   'resnet_untrained_normalized.parquet',
     'subcell':            'subcell_normalized.parquet',
 }
+if args.models:
+    unknown_models = sorted(set(args.models) - set(MODELS))
+    if unknown_models:
+        raise ValueError(f"Unknown models: {unknown_models}")
+    MODELS = {model: MODELS[model] for model in args.models}
 MODEL_DISPLAY = {
     'cellprofiler': 'CellProfiler', 'cloome': 'CLOOME',
     'dino_v2_cls_token': 'DINOv2 CLS', 'dino_v2_patch_token': 'DINOv2 Patch',
@@ -467,67 +473,69 @@ def main():
     # ═══════════════════════════════════════════════════════════════════════
     # Panel 2: cpg-compound (4 paradigms)
     # ═══════════════════════════════════════════════════════════════════════
-    print(f"\n{'='*80}")
-    print("Panel 2: cpg-compound — 4 paradigms")
-    print("=" * 80)
-
     cpg_paradigms = ['No Restriction', 'Not Same Batch', 'Not Same Source', 'Not Same Layout', 'Not Same Source Layout']
     cpg_dir = os.path.join(FEATURES_BASE, 'cpg-compound')
-
-    print("\n  Finding eligible compounds...")
-    shared = cpg_compound_eligible()
-    if args.cpg_compound_selection == "sample10k":
-        rng = np.random.RandomState(SEED)
-        selected = sorted(rng.choice(shared, N_COMPOUNDS, replace=False)) if len(shared) > N_COMPOUNDS else shared
-    else:
-        selected = shared
-    selected_set = set(selected)
-    print(f"  Selected {len(selected)} compounds ({args.cpg_compound_selection})")
-
+    selected = []
+    selected_set = set()
     cpg_knn = {}
     cpg_map = {}
     cpg_well_counts = {}
 
-    for model, fname in MODELS.items():
-        t0 = time.time()
-        path = os.path.join(cpg_dir, fname)
-        df = pd.read_parquet(path)
-        df = maybe_apply_cell_count_qc(df, 'cpg-compound')
-        df = df[df['Metadata_JCP2022'] != DMSO_JCP].reset_index(drop=True)
-        df = subsample_cpg(df, selected_set)
-        cpg_well_counts[model] = len(df)
+    if args.only_dataset in ("both", "cpg-compound"):
+        print(f"\n{'='*80}")
+        print("Panel 2: cpg-compound — 4 paradigms")
+        print("=" * 80)
 
-        if args.estimate_only:
-            print(f"  {MODEL_DISPLAY[model]}: {len(df)} wells after cpg-compound selection")
-            continue
+        print("\n  Finding eligible compounds...")
+        shared = cpg_compound_eligible()
+        if args.cpg_compound_selection == "sample10k":
+            rng = np.random.RandomState(SEED)
+            selected = sorted(rng.choice(shared, N_COMPOUNDS, replace=False)) if len(shared) > N_COMPOUNDS else shared
+        else:
+            selected = shared
+        selected_set = set(selected)
+        print(f"  Selected {len(selected)} compounds ({args.cpg_compound_selection})")
 
-        feat_cols = [c for c in df.columns if not c.startswith('Metadata_')]
-        Xn = _l2_normalize(df[feat_cols].values)
-        compounds = df['Metadata_JCP2022'].values
-        batches = df['Metadata_Batch'].values
-        sources = df['Metadata_Source'].values
-        wells = df['Metadata_Well'].values
+        for model, fname in MODELS.items():
+            t0 = time.time()
+            path = os.path.join(cpg_dir, fname)
+            df = pd.read_parquet(path)
+            df = maybe_apply_cell_count_qc(df, 'cpg-compound')
+            df = df[df['Metadata_JCP2022'] != DMSO_JCP].reset_index(drop=True)
+            df = subsample_cpg(df, selected_set)
+            cpg_well_counts[model] = len(df)
 
-        display = MODEL_DISPLAY[model]
-        print(f"\n  {display}: {len(df)} wells")
+            if args.estimate_only:
+                print(f"  {MODEL_DISPLAY[model]}: {len(df)} wells after cpg-compound selection")
+                continue
 
-        knn = run_knn(Xn, compounds, batches, sources, wells, cpg_paradigms) if RUN_KNN_REPLICATE else {}
-        if RUN_KNN_REPLICATE:
-            cpg_knn[model] = knn
+            feat_cols = [c for c in df.columns if not c.startswith('Metadata_')]
+            Xn = _l2_normalize(df[feat_cols].values)
+            compounds = df['Metadata_JCP2022'].values
+            batches = df['Metadata_Batch'].values
+            sources = df['Metadata_Source'].values
+            wells = df['Metadata_Well'].values
 
-        mp = run_map(Xn, compounds, batches, sources, wells, cpg_paradigms) if RUN_MAP else {}
-        if RUN_MAP:
-            cpg_map[model] = mp
+            display = MODEL_DISPLAY[model]
+            print(f"\n  {display}: {len(df)} wells")
 
-        elapsed = time.time() - t0
-        for p in cpg_paradigms:
-            parts = []
+            knn = run_knn(Xn, compounds, batches, sources, wells, cpg_paradigms) if RUN_KNN_REPLICATE else {}
             if RUN_KNN_REPLICATE:
-                parts.append(f"KNN={knn[p]['recall']:.2f}% ({knn[p]['n_eligible']}q)")
+                cpg_knn[model] = knn
+
+            mp = run_map(Xn, compounds, batches, sources, wells, cpg_paradigms) if RUN_MAP else {}
             if RUN_MAP:
-                parts.append(f"mAP={mp[p]['mAP']:.4f}% ({mp[p]['n_queries']}q)")
-            print(f"    {p}: " + "  ".join(parts))
-        print(f"    [{elapsed:.0f}s]")
+                cpg_map[model] = mp
+
+            elapsed = time.time() - t0
+            for p in cpg_paradigms:
+                parts = []
+                if RUN_KNN_REPLICATE:
+                    parts.append(f"KNN={knn[p]['recall']:.2f}% ({knn[p]['n_eligible']}q)")
+                if RUN_MAP:
+                    parts.append(f"mAP={mp[p]['mAP']:.4f}% ({mp[p]['n_queries']}q)")
+                print(f"    {p}: " + "  ".join(parts))
+            print(f"    [{elapsed:.0f}s]")
 
     if args.estimate_only:
         out = {
@@ -584,7 +592,26 @@ def main():
                     line += f"{knn_res[m][p]['recall']:>17.2f}%"
                 print(line)
 
-    if args.only_dataset != "both":
+    if args.only_dataset == "cpg-tgt2":
+        out = {
+            'tgt2_knn': tgt2_knn, 'tgt2_map': tgt2_map,
+            'cpg_knn': {}, 'cpg_map': {},
+            'tgt2_paradigms': tgt2_paradigms, 'cpg_paradigms': cpg_paradigms,
+            'cell_count_qc': {
+                'enabled': cell_count_qc_enabled(args),
+                'summaries': {
+                    dataset: mask.attrs.get('cell_count_qc_summary', {})
+                    for dataset, mask in QC_MASKS.items()
+                },
+            },
+        }
+        pkl_path = os.path.join(RESULTS_DIR, 'knn_results.pkl')
+        with open(pkl_path, 'wb') as f:
+            pickle.dump(out, f)
+        print(f"Results: {pkl_path}")
+        return
+
+    if args.only_dataset == "cpg-compound":
         out = {
             'cpg_knn': cpg_knn, 'cpg_map': cpg_map,
             'cpg_paradigms': cpg_paradigms,
@@ -716,6 +743,7 @@ def ensure_all_eligible_selection() -> None:
         "cpg-compound",
         "--cpg-compound-selection",
         "all_eligible",
+        *(["--models", *args.models] if args.models else []),
         *cell_count_qc_cli_args(args),
     ]
     print("+ " + " ".join(cmd))
@@ -737,6 +765,7 @@ def run_negative_control_benchmark() -> None:
         negcon_dir,
         "--selection-pickle",
         selection_pickle,
+        *(["--models", *args.models] if args.models else []),
         *cell_count_qc_cli_args(args),
     ]
     print("+ " + " ".join(cmd))

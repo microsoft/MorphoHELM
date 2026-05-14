@@ -118,6 +118,8 @@ def main() -> None:
             str(results_dir / "moa_cross_source_profiles.pkl"),
             "--output",
             str(results_dir / "moa_enrichment_results.pkl"),
+            "--n-resamples",
+            n_resamples,
         ]
         if "bbbc036_moa" in selected:
             cpg_cmd.extend(["--bbbc-results", str(results_dir / "bbbc036_moa_enrichment.pkl")])

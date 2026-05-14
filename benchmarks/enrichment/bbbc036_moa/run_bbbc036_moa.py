@@ -4,6 +4,7 @@ import argparse, os, sys, pickle, glob
 from pathlib import Path
 import pandas as pd
 import numpy as np
+from scipy.stats import permutation_test
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(PROJECT_ROOT / "benchmarks"))
@@ -39,19 +40,18 @@ def get_odds_ratio(target_hits, background_hits):
     return (a * d) / (b * c)
 
 
-def permutation_pvalue(target_hits, background_hits, n_resamples, rng):
-    """Fixed-hit-count Monte Carlo p-value matching the cpg-MoA null."""
+def permutation_pvalue(target_hits, background_hits, n_resamples):
+    """Permutation p-value matching the paper-era BBBC036 MoA benchmark."""
     target_hits = np.asarray(target_hits, dtype=np.int8)
     background_hits = np.asarray(background_hits, dtype=np.int8)
-    observed = get_odds_ratio(target_hits, background_hits)
-    combined = np.concatenate([target_hits, background_hits])
-    target_size = len(target_hits)
-    exceed_count = 0
-    for _ in range(n_resamples):
-        permuted = rng.permutation(combined)
-        perm_odds = get_odds_ratio(permuted[:target_size], permuted[target_size:])
-        exceed_count += perm_odds >= observed
-    return observed, (exceed_count + 1) / (n_resamples + 1)
+    result = permutation_test(
+        (target_hits, background_hits),
+        statistic=get_odds_ratio,
+        n_resamples=n_resamples,
+        alternative="greater",
+        random_state=RANDOM_STATE,
+    )
+    return result.statistic, result.pvalue
 
 
 def main():
@@ -123,12 +123,15 @@ def main():
         moa_map = df_filt.drop_duplicates("Metadata_broad_sample").set_index("Metadata_broad_sample")["Metadata_moa"]
         agg["Metadata_moa"] = agg["Metadata_broad_sample"].map(moa_map)
         
-        # Drop singletons
+        # Keep every MoA-labeled compound in the ranked candidate pool, but only
+        # query compounds whose MoA has at least one possible match. This matches
+        # the paper-era BBBC036 enrichment implementation.
         moa_counts = agg["Metadata_moa"].value_counts()
-        valid_moas = moa_counts[moa_counts >= 2].index
-        agg = agg[agg["Metadata_moa"].isin(valid_moas)]
+        valid_moas = set(moa_counts[moa_counts >= 2].index)
+        testable_mask = agg["Metadata_moa"].isin(valid_moas).to_numpy()
+        n_testable = int(testable_mask.sum())
         
-        if len(agg) < 20:
+        if n_testable < 5:
             print(f"    Too few compounds after filtering ({len(agg)})")
             continue
         
@@ -140,18 +143,21 @@ def main():
         np.fill_diagonal(sim, -1)
         
         n = len(agg)
-        n_unique_candidates = n - 1
-        cutoff = max(1, int(n_unique_candidates * 0.01))  # top 1% of self-excluded compounds
         moas = agg["Metadata_moa"].values
         
         odds_ratios = []
         p_values = []
         processed_compounds = []
         significant_compounds = []
-        rng = np.random.default_rng(RANDOM_STATE)
+        cutoff = None
         
         for i in range(n):
+            if not testable_mask[i]:
+                continue
             ranked_idx = [j for j in np.argsort(-sim[i]) if j != i]
+            cutoff = max(2, len(ranked_idx) // 100)
+            if len(ranked_idx) < cutoff + 2:
+                continue
             top_idx = ranked_idx[:cutoff]
             background_idx = ranked_idx[cutoff:]
             if i in top_idx:
@@ -162,7 +168,7 @@ def main():
             background = np.asarray([moas[j] == moas[i] for j in background_idx], dtype=np.int8)
             if target.sum() + background.sum() == 0:
                 continue
-            odds, pval = permutation_pvalue(target, background, args.n_resamples, rng)
+            odds, pval = permutation_pvalue(target, background, args.n_resamples)
             odds_ratios.append(odds)
             p_values.append(pval)
             compound = agg.iloc[i]["Metadata_broad_sample"]
@@ -184,8 +190,9 @@ def main():
             "processed_compounds": processed_compounds,
             "significant_compounds": significant_compounds,
             "n_compounds": len(agg),
+            "n_processed": len(p_values),
             "n_moas": len(valid_moas),
-            "n_unique_candidates": n_unique_candidates,
+            "n_unique_candidates": len(agg) - 1,
             "cutoff_items": cutoff,
             "cutoff_fraction": 0.01,
             "ranking_unit": "unique_compound",

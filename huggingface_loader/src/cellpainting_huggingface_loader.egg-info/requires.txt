@@ -1,5 +1,5 @@
 numpy
 pandas
-opencv-python
+opencv-python-headless
 datasets
 pyarrow
