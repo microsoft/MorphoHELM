@@ -39,13 +39,15 @@ RANDOM_STATE = 61
 MAX_BATCHES = None
 MAX_SOURCES = None
 
-# Canonical model order (all 8)
+# Canonical model order (RobuDINO first, then the 8 baselines)
 ALL_MODELS = [
+    "dino_v2_cellpainting",
     "cellprofiler", "cloome", "dino_v2_cls", "dino_v2_patch",
     "open_phenom", "resnet", "resnet_untrained", "subcell",
 ]
 
 MODEL_LABELS = {
+    "dino_v2_cellpainting": "RobuDINO",
     "cellprofiler": "CellProfiler",
     "cloome": "CLOOME",
     "dino_v2_cls": "DINOv2 CLS",
@@ -58,6 +60,7 @@ MODEL_LABELS = {
 
 # CPJump model names → canonical names
 CPJUMP_TO_CANONICAL = {
+    "dino_v2_cellpainting": "dino_v2_cellpainting",
     "openphenom": "open_phenom",
     "cellprofiler": "cellprofiler",
     "dino_v2": "dino_v2_cls",

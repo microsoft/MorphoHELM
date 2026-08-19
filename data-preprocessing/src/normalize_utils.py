@@ -42,8 +42,13 @@ def embed_by_pca(
     features: np.ndarray,
     n_components: int = 128,
 ) -> np.ndarray:
-    """PCA on the full dataset. Returns (N, n_components) float32 array."""
-    pca = PCA(n_components=n_components)
+    """PCA on the full dataset. Returns (N, n_components) float32 array.
+
+    ``random_state`` and ``svd_solver`` are pinned so the transform is fully
+    reproducible run-to-run (the default 'auto' solver picks the stochastic
+    'randomized' SVD for these shapes).
+    """
+    pca = PCA(n_components=n_components, svd_solver="full", random_state=0)
     return pca.fit_transform(features).astype(np.float32)
 
 
